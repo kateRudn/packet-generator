@@ -1,12 +1,92 @@
 import PySimpleGUI as sg
 import scapy.all as sc
+from scapy.layers.inet import *
+from scapy.all import send, get_windows_if_list #send - посылка пакетов, get_windows_if_list - показ доступных  сетевых интерфейсов
+from datetime import datetime
+
 
 interfaces=[]
+
+TCP_NUM = 6
+UDP_NUM = 17
+ICMP_NUM = 1
 
 def showInterfaces():
     for interface in sc.get_windows_if_list():
         interfaces.append(interface['name'] + ': ' + interface['description'])
     return interfaces;
+
+def calcTOS(values):
+    tos = bin(int(values['prec']))
+    tos = str(tos)
+    if values['delay']:
+        tos += '1'
+    else:
+        tos += '0'
+    if values['bandw']:
+        tos += '1'
+    else:
+        tos += '0'
+    if values['reliab']:
+        tos += '1'
+    else:
+        tos += '0'
+
+    if values['ecn'] == 'ECT':
+        tos += '01'
+    if values['ecn'] == 'Not-ECT':
+        tos += '00'
+    else:
+        tos += '11'
+
+    tos = int(tos, 2)
+    return tos
+
+def calcFlags(values):
+    return "{0}{1}{2}".format(str(int(values['res'])), str(int(values['df'])), str(int(values['mf'])))
+
+def toDec(x, n):
+    try:
+        return int(x, n)
+    except:
+        return 'Input Error'
+
+def ipPckt(values):
+    ipPacket=IP()
+    if values['win']=='TCPwin':
+        ipPacket.proto=TCP_NUM
+        #print ("TCP")
+    elif values['win']=='UDPwin':
+        ipPacket.proto=UDP_NUM
+    elif values['win']=='ICMPwin':
+        ipPacket.proto=ICMP_NUM
+    ipPacket.ttl = int(values['ttl'])
+    ipPacket.ihl = int(values['ihl'])
+    ipPacket.tos = calcTOS(values)
+    ipPacket.id = int(values['id'])
+    ipPacket.len = int(values['lenght'])
+    ipPacket.frag = int(values['offset'])
+    ipPacket.version = int(values['version'])
+    ipPacket.chksum = int(values['chksum'])
+    if (values['dst']):
+        ipPacket.dst = values['dst']
+    if (values['src']):
+        ipPacket.src = values['src']
+    ipPacket.flags = toDec(calcFlags(values), 2)
+    return ipPacket
+
+def tcpPckt(values):
+    tcpPacket = TCP()
+    if (values['srcportTCP']):
+        tcpPacket.sport=int(values['srcportTCP'])
+    if (values['destportTCP']):
+        tcpPacket.sport=int(values['srcportTCP'])
+    tcpPacket.seq = int(values['seqnumTCP'])
+    tcpPacket.ack = int(values['acknumTCP'])
+    tcpPacket.dataofs = int(values['offsetTCP'])
+    tcpPacket.reserved = int(values['resTCP'])
+    tcpPacket.reserved = int(values['resTCP'])
+    return tcpPacket
 
 layout_tcp = [[sg.Frame('Fields', [[sg.Column([
                 [sg.Text('Source Port'), sg.InputText(size=(10, 20), key='srcportTCP', pad=(0,0))],
@@ -93,7 +173,7 @@ layout_protocols = [
 layout_other=[sg.Submit(), sg.Cancel()]
 layout_send=[[sg.Output(size=(50,10))]]
 lau1=sg.Column([[sg.Frame('IPv4', layout_ipv4)]])
-lau2=sg.Column([[sg.Frame('Protocols', layout_protocols)], [sg.Frame('Send', layout_send)]])
+lau2=sg.Column([[sg.Frame('Protocols', layout_protocols)], [sg.Frame('Send', layout_send)], [sg.Button('Add packet', key='addPckt'), sg.Button('Clear', key='clearPckt'), sg.Button('Send', key='sendPckt')]])
 layout=[layout_ntwrk, [lau1, lau2], layout_other]
 window = sg.Window('Packet Generator', layout)
 
@@ -101,5 +181,7 @@ while True:
     event, values = window.read()
     if event in (None, 'Exit', 'Cancel'):
         break
-    #if event == 'Submit':
+    if event == 'Submit':
+        ipPckt(values)
 window.close()
+
