@@ -1,2 +1,2 @@
 # packet-generator
-Simpe packet generator with graphic design.
+Simple packet generator with graphic design.
